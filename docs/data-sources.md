@@ -29,4 +29,4 @@ These counts are the baseline for the first data quality check (bronze table row
 ## Notes
 
 - The source is updated regularly, so a later download will not match these counts (especially 2026). Re-downloads must record a new date and new counts.
-- Raw files are stored in OneLake (`lh_bronze`, `Files/base/contratos/<year>/`), not in Git.
+- Raw files are stored in OneLake (`lh_bronze`, `Files/contratos/<year>/`), not in Git.
