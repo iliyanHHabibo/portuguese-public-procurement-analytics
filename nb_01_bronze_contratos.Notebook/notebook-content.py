@@ -43,11 +43,14 @@ TABLE_NAME = 'bronze_contratos'
 
 #let us compare the cols (name and data type) for each year, using 2022 as the ref year
 #we will also count the number of rows for each file
+
+#a dict with each year and its cols
 dict_year_cols = {}
+#a dict with each year and the number of rows in its file
+dict_year_rows = {}
 
-sum_rows_files = 0
 
-#arranging a dict with the years and its corresponding cols 
+#Per year: store the schema and row count
 for year in LIST_YEARS:
     folder_file_path = f"/{year}/Contratos{year}.json"
     df = (
@@ -56,8 +59,13 @@ for year in LIST_YEARS:
         .json(BASE_PATH + folder_file_path)
     )
     dict_year_cols[year] = set (df.dtypes)
-    print (f"{year} file row count : {df.count()}")
-    sum_rows_files += df.count()
+    number_rows_year = df.count()
+    dict_year_rows[year] = number_rows_year
+    print (f"{year} file row count : {number_rows_year}")
+    
+
+#total number of rows
+sum_rows_files = sum(dict_year_rows.values())
 
 print ("Comparison below:")
 #comparing the difference 
@@ -67,7 +75,11 @@ for year in dict_year_cols.keys():
     
     comparison_2022_year = dict_year_cols[2022].difference(dict_year_cols[year])
     comparison_year_2022 = dict_year_cols[year].difference(dict_year_cols[2022])
-    print (f"{year} -> missing: {comparison_2022_year} | extra: {comparison_year_2022}")
+    # Drift = warn, not fail: bronze lands raw data as-is; silver handles schema changes (null-rate checks per year catch renamed columns)
+    if comparison_2022_year or comparison_year_2022:
+        print (f"WARNING: schema drift in {year} -> missing: {comparison_2022_year} | extra: {comparison_year_2022}")
+    else:
+        print(f"{year} : No schema drift")
 
 # METADATA ********************
 
@@ -87,6 +99,8 @@ df = (
     .withColumn ("_source_file", F.col("_metadata.file_path"))
     .withColumn ("_load_ts", F.current_timestamp())
 )
+
+display(df.select("_source_file").distinct())
 
 # Gate: don't overwrite the table unless every source row was read
 df_row_count = df.count()
@@ -112,10 +126,13 @@ print(f"{TABLE_NAME} written: {df_row_count:,} rows")
 
 # CELL ********************
 
+# MAGIC %%sql
+# MAGIC -- verification: confirm the write replaced the table and check the row count
+# MAGIC DESCRIBE HISTORY bronze_contratos;
 
 # METADATA ********************
 
 # META {
-# META   "language": "python",
+# META   "language": "sparksql",
 # META   "language_group": "synapse_pyspark"
 # META }
